@@ -1,0 +1,104 @@
+.form-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.form-section {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  padding: 2rem;
+  transition: all 0.3s ease-in-out;
+}
+
+.form-section:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.form-progress {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: white;
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+}
+
+.progress-step {
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+
+.progress-step::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #e5e7eb;
+}
+
+.progress-step.active::after {
+  background: #4f46e5;
+}
+
+.image-preview {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: #f3f4f6;
+}
+
+.image-preview img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.variant-card {
+  transition: all 0.3s ease-in-out;
+}
+
+.variant-card:hover {
+  transform: translateX(5px);
+}
+
+.drag-drop-zone {
+  border: 2px dashed #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.3s ease-in-out;
+}
+
+.drag-drop-zone.dragging {
+  border-color: #4f46e5;
+  background: #eef2ff;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #4f46e5 #e5e7eb;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #e5e7eb;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #4f46e5;
+  border-radius: 3px;
+}
+
