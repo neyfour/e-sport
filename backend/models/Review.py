@@ -16,7 +16,8 @@ class ReviewModel(BaseModel):
     comment: str = Field(...)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     user_name: str = Field(...)
-    user_avatar: Optional[str] = Field(None) 
+    user_avatar: Optional[str] = Field(None)
+    verified: Optional[bool] = Field(False)  # Added verified field with default False
 
     class Config:
         allow_population_by_field_name = True
@@ -31,6 +32,7 @@ class ReviewModel(BaseModel):
                 "comment": "This product is amazing!",
                 "user_name": "John Doe",
                 "user_avatar": "url_to_avatar",
+                "verified": False
             }
         }
 
@@ -54,4 +56,3 @@ def delete_review(id: str):
 def list_reviews(product_id: str):
     reviews = list(db.reviews.find({"product_id": product_id}))
     return reviews
-

@@ -20,8 +20,8 @@ import LazyImage from "../components/LazyImage"
 import ReviewsList from "../components/ReviewsList"
 import ReviewForm from "../components/ReviewForm"
 import type { Review, Product } from "../types"
-import { getProductReviews } from "@/api/reviewApi"
-import { getProductById, getProducts } from "@/api/productApi"
+import { getProductReviews } from "../api/reviewApi"
+import { getProductById, getProducts } from "../api/productApi"
 
 export default function ProductDetails() {
   const { productId } = useParams()
@@ -204,9 +204,7 @@ export default function ProductDetails() {
     // If product has no additional images, create some placeholders
     return [
       mainImage,
-      "https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&q=80&w=800",
+   
     ]
   }
 

@@ -6,7 +6,8 @@ import { TrendingUp, ArrowRight, ChevronRight, ShoppingBag, Award, Users } from 
 import LazyImage from "../components/LazyImage"
 import ProductPreviewModal from "../components/ProductPreviewModal"
 import ProductCard from "../components/ProductCard"
-import { getProducts } from "../api/productApi"
+import { getProducts , getProductCategories  } from "../api/productApi"
+
 
 import "../styles/Home.css"
 
@@ -15,7 +16,7 @@ import "../styles/Home.css"
 export default function Home() {
   const navigate = useNavigate()
   const { user } = useStore()
-
+  const [categoriesData, setCategoriesData] = useState<any[]>([])
   const [featuredProducts, setFeaturedProducts] = useState([])
   const [popularProducts, setPopularProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,56 +24,40 @@ export default function Home() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   useEffect(() => {
-    fetchProducts()
+    fetchData()
   }, [])
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     setLoading(true)
     try {
       // Fetch all products
-      const products = await getProducts()
+      const allProducts = await getProducts()
 
       // Sort by rating for featured products (highest rated)
-      const featured = [...products].sort((a, b) => b.rating - a.rating).slice(0, 6)
+      const featured = [...allProducts].sort((a, b) => b.rating - a.rating).slice(0, 6)
 
       // Sort by views for popular products
-      const popular = [...products].sort((a, b) => b.views_count - a.views_count).slice(0, 4)
+      const popular = [...allProducts].sort((a, b) => b.views_count - a.views_count).slice(0, 4)
 
       setFeaturedProducts(featured)
       setPopularProducts(popular)
+
+      // Fetch categories
+      const categories = await getProductCategories()
+      setCategoriesData(
+        categories.map((category) => ({
+          id: category.toLowerCase(),
+          title: category,
+          image: `/categories/${category.toLowerCase()}.jpg`, // Construct image URL
+          products: allProducts.filter((product) => product.category === category).length,
+        })),
+      )
     } catch (error) {
-      console.error("Error fetching products:", error)
+      console.error("Error fetching data:", error)
     } finally {
       setLoading(false)
     }
   }
-
-  const categories = [
-    {
-      id: "soccer",
-      title: "Soccer",
-      image: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&q=80&w=800",
-      products: 245,
-    },
-    {
-      id: "basketball",
-      title: "Basketball",
-      image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&q=80&w=800",
-      products: 189,
-    },
-    {
-      id: "running",
-      title: "Running",
-      image: "https://images.unsplash.com/photo-1595341888016-a392ef81b7de?auto=format&fit=crop&q=80&w=800",
-      products: 312,
-    },
-    {
-      id: "fitness",
-      title: "Fitness",
-      image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=800",
-      products: 423,
-    },
-  ]
 
   const handleGetStarted = () => {
     if (user) {
@@ -106,7 +91,7 @@ export default function Home() {
       <section className="hero-section">
         <div className="absolute inset-0 bg-black/40 z-10" />
         <img
-          src="https://img.freepik.com/free-photo/view-gym-room-training-sports_23-2151699494.jpg?uid=R186796868&ga=GA1.1.1852284681.1743187124&w=740"
+          src="https://images-ext-1.discordapp.net/external/bacfxHnJ2UulJYDQTgoHT5S9wAouykAQNRKE_KZ7Pts/https/cdn11.bigcommerce.com/s-8yxoh6lp1a/images/stencil/original/image-manager/north-york-on/Soccer%2520cleats%2520plus-1170x780.JPG?format=webp&width=1492&height=994"
           alt="Hero"
           className="absolute inset-0 w-full h-full object-cover hero-image"
         />
@@ -162,8 +147,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Categories */}
-      <section className="py-16 px-4 bg-gray-50 dark:bg-gray-800">
+   {/* Featured Categories */}
+   <section className="py-16 px-4 bg-gray-50 dark:bg-gray-800">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Shop by Category</h2>
@@ -175,27 +160,33 @@ export default function Home() {
               <ChevronRight className="w-5 h-5 ml-1" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                to={`/categories/${category.id}`}
-                className="category-card group relative overflow-hidden rounded-xl shadow-sm"
-              >
-                <LazyImage
-                  src={category.image}
-                  alt={category.title}
-                  className="w-full h-64 object-cover category-image"
-                />
-                <div className="category-overlay absolute inset-0 flex flex-col justify-end p-6">
-                  <h3 className="text-xl font-bold text-white mb-2">{category.title}</h3>
-                  <div className="category-stats flex items-center text-white">
-                    <span className="text-sm">{category.products} Products</span>
-                    <ArrowRight className="w-4 h-4 ml-2" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin h-12 w-12 border-4 border-indigo-600 rounded-full border-t-transparent"></div>
+              </div>
+            ) : (
+              categoriesData.slice(0, 3).map((category) => (
+                <Link
+                  key={category.id}
+                  to={`/shop?category=${category.title}`}
+                  className="category-card group relative overflow-hidden rounded-xl shadow-sm"
+                >
+                  <LazyImage
+                    src={category.image}
+                    alt={category.title}
+                    className="w-full h-64 object-cover category-image"
+                  />
+                  <div className="category-overlay absolute inset-0 flex flex-col justify-end p-6">
+                    <h3 className="text-xl font-bold text-white mb-2">{category.title}</h3>
+                    <div className="category-stats flex items-center text-white">
+                      <span className="text-sm">{category.products} Products</span>
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -232,7 +223,7 @@ export default function Home() {
       <section className="py-16 px-4 bg-gray-50 dark:bg-gray-800">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white text-center mb-12">
-            Why Choose Matrix Commerce
+            Why Choose E-SPORTS
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm p-8 text-center">

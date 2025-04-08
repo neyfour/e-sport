@@ -52,6 +52,8 @@ import EditProduct from "./pages/EditProduct"
 import SuperAdminProducts from "./pages/SuperAdminProducts"
 import SellerCommissionPage from "./pages/sellercommissionpage"
 import SuperAdminSetting from "./pages/superadminsetting"
+import ProductDetails from "./pages/ProductDetails"
+import SellerProductReviewsPage from "./pages/SellerProductReviewsPage"
 
 // Protected route wrapper
 const ProtectedRoute = ({ children, requiredRole }: { children: JSX.Element; requiredRole?: string | string[] }) => {
@@ -309,6 +311,14 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/products/reviews"
+                  element={
+                    <ProtectedRoute requiredRole="seller">
+                      <SellerProductReviewsPage />
+                    </ProtectedRoute>
+                  }
+                />
               </Routes>
             </DashboardLayout>
           }
@@ -344,6 +354,7 @@ function App() {
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route path="/payment" element={<Payment />} />
                   <Route path="/profile" element={<Settings />} />
+                  <Route path="/product-details/:productId" element={<   ProductDetails    />}     />
                 </Routes>
               </main>
               <Chatbot />

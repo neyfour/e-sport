@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, HTTPException, Depends
-from typing import List
+from typing import Dict, Any
 from models.Review import ReviewModel, create_review, get_review, update_review, delete_review, list_reviews
 from .users import get_current_user
 from bson import ObjectId
@@ -53,6 +53,59 @@ async def update_review_data(id: str, review: ReviewModel = Body(...), current_u
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Fixed verify endpoint with proper ObjectId handling
+@router.put("/{id}/verify", response_description="Verify or unverify a review")
+async def verify_review(id: str, data: Dict[str, Any] = Body(...), current_user: dict = Depends(get_current_user)):
+    try:
+        # Check if the current user is a seller or admin
+        if current_user["role"] not in ["seller", "admin", "superadmin"]:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to verify reviews"
+            )
+        
+        existing_review = get_review(id)
+        if not existing_review:
+            raise HTTPException(status_code=404, detail=f"Review with id {id} not found")
+        
+        # Get the verified status from the request body
+        verified_status = data.get("verified", False)
+        
+        # Update only the verified field in the database directly
+        db = update_review.__globals__['db']  # Get the db from the update_review function
+        db.reviews.update_one(
+            {"_id": ObjectId(id)}, 
+            {"$set": {"verified": verified_status}}
+        )
+        
+        # Get the updated review
+        updated_review = get_review(id)
+        
+        if updated_review:
+            # Convert ObjectId to string for JSON serialization
+            serialized_review = {
+                "id": str(updated_review["_id"]),
+                "product_id": str(updated_review["product_id"]) if isinstance(updated_review["product_id"], ObjectId) else updated_review["product_id"],
+                "user_id": str(updated_review["user_id"]) if isinstance(updated_review["user_id"], ObjectId) else updated_review["user_id"],
+                "rating": updated_review["rating"],
+                "comment": updated_review["comment"],
+                "user_name": updated_review["user_name"],
+                "verified": verified_status,
+                "created_at": updated_review.get("created_at", ""),
+            }
+            
+            # Add optional fields if they exist
+            if "user_avatar" in updated_review:
+                serialized_review["user_avatar"] = updated_review["user_avatar"]
+            
+            return {
+                "message": f"Review {'verified' if verified_status else 'unverified'} successfully", 
+                "review": serialized_review
+            }
+        
+        raise HTTPException(status_code=404, detail=f"Review with id {id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/{id}", response_description="Delete a review")
 async def delete_review_data(id: str, current_user: dict = Depends(get_current_user)):
     try:
@@ -86,4 +139,3 @@ async def list_product_reviews(product_id: str):
         return reviews
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

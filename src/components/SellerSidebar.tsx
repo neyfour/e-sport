@@ -1,7 +1,9 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -10,17 +12,17 @@ import {
   BarChart3,
   TrendingUp,
   Settings,
-  HelpCircle,
   Menu,
   X,
-  LogOut,
   Store,
+  ListIcon,
 } from "lucide-react"
 import { useStore } from "../store"
 
 export default function SellerSidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const logout = useStore((state) => state.logout)
 
   const toggleSidebar = () => {
@@ -37,6 +39,12 @@ export default function SellerSidebar() {
 
   const isActive = (path: string) => {
     return location.pathname === path
+  }
+
+  const handleReviewsClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    navigate("/seller/products/reviews")
+    closeSidebar()
   }
 
   return (
@@ -134,7 +142,20 @@ export default function SellerSidebar() {
                   <span>Chat</span>
                 </Link>
               </li>
-
+              <li>
+                <a
+                  href="/seller/products/reviews"
+                  className={`flex items-center px-3 py-2 rounded-lg ${
+                    location.pathname.includes("/seller/products/reviews")
+                      ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
+                  onClick={handleReviewsClick}
+                >
+                  <ListIcon className="w-5 h-5 mr-2" />
+                  <span>Product Reviews</span>
+                </a>
+              </li>
               <li className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Analytics
@@ -178,7 +199,7 @@ export default function SellerSidebar() {
                 <Link
                   to="/seller/profile-settings"
                   className={`flex items-center px-3 py-2 rounded-lg ${
-                    isActive("/seller/settings")
+                    isActive("/seller/profile-settings")
                       ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
                       : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                   }`}
@@ -188,25 +209,23 @@ export default function SellerSidebar() {
                   <span>Account Settings</span>
                 </Link>
               </li>
-           
-              <li>
-              <Link
-            to="/"
-          className={`flex items-center px-3 py-2 rounded-lg ${
-            isActive("/")
-              ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
-              : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-          }`}
-          onClick={closeSidebar}>
-              <Store className="w-5 h-5 mr-2" />
-            <span>Back to Store</span>
-         </Link>
 
+              <li>
+                <Link
+                  to="/"
+                  className={`flex items-center px-3 py-2 rounded-lg ${
+                    isActive("/")
+                      ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
+                  onClick={closeSidebar}
+                >
+                  <Store className="w-5 h-5 mr-2" />
+                  <span>Back to Store</span>
+                </Link>
               </li>
             </ul>
           </nav>
-
-    
         </div>
       </aside>
     </>
