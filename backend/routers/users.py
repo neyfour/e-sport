@@ -18,9 +18,9 @@ from fastapi_mail.errors import ConnectionErrors
 
 # Configure FastMail
 conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME", " amine82baadi@gmail.com"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", "bhqy jius rczk isdi"),
-    MAIL_FROM=os.getenv("MAIL_FROM", "amine82baadi@gmail.com"),
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME", " "),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", ""),
+    MAIL_FROM=os.getenv("MAIL_FROM", ""),
     MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
     MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
     MAIL_STARTTLS=True,
