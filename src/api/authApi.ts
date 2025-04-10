@@ -20,9 +20,9 @@ interface LoginResponse {
 }
 
 export const registerUser = async (userData: {
-  username: string;
-  email: string;
-  password: string;
+  username: string
+  email: string
+  password: string
 }): Promise<User> => {
   try {
     const response = await fetch(`${api.url}/users/register`, {
@@ -35,40 +35,38 @@ export const registerUser = async (userData: {
         email: userData.email,
         password: userData.password,
       }),
-    });
+    })
 
     if (!response.ok) {
       // Try to parse error response
-      let errorMessage = "Registration failed";
+      let errorMessage = "Registration failed"
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.detail || errorMessage;
-        
+        const errorData = await response.json()
+        errorMessage = errorData.detail || errorMessage
+
         // Handle validation errors
         if (errorData.detail && Array.isArray(errorData.detail)) {
-          errorMessage = errorData.detail.map((err: any) => 
-            `${err.loc.join('.')}: ${err.msg}`
-          ).join('\n');
+          errorMessage = errorData.detail.map((err: any) => `${err.loc.join(".")}: ${err.msg}`).join("\n")
         }
       } catch (e) {
-        console.error("Failed to parse error response:", e);
+        console.error("Failed to parse error response:", e)
       }
-      throw new Error(errorMessage);
+      throw new Error(errorMessage)
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     // Store token if available
     if (data.access_token) {
-      localStorage.setItem("auth_token", data.access_token);
+      localStorage.setItem("auth_token", data.access_token)
     }
 
-    return data.user;
+    return data.user
   } catch (error) {
-    console.error("Registration error:", error);
-    throw error;
+    console.error("Registration error:", error)
+    throw error
   }
-};
+}
 // Update the loginUser function to match the backend API
 export const loginUser = async (email: string, password: string): Promise<User> => {
   try {
@@ -88,25 +86,23 @@ export const loginUser = async (email: string, password: string): Promise<User> 
 
     if (!response.ok) {
       // Handle suspension and other errors
-      const errorData = await response.json().catch(() => ({}));
-      
+      const errorData = await response.json().catch(() => ({}))
+
       if (response.status === 403 && errorData.detail) {
-        throw new Error(`Account suspended until ${errorData.detail}`);
+        throw new Error(`Account suspended until ${errorData.detail}`)
       }
-      
-      throw new Error(errorData.detail || "Login failed");
+
+      throw new Error(errorData.detail || "Login failed")
     }
 
-    const data: LoginResponse = await response.json();
+    const data: LoginResponse = await response.json()
 
     // Store token in localStorage for future requests
-    localStorage.setItem("auth_token", data.access_token);
-    return data.user;
-
+    localStorage.setItem("auth_token", data.access_token)
+    return data.user
   } catch (error) {
     console.error("Login error:", error)
     throw error
-    
   }
 }
 
@@ -429,3 +425,75 @@ export const markAllNotificationsAsRead = async (token: string): Promise<any> =>
   }
 }
 
+// Add a new function to request password reset verification code
+export const requestPasswordResetCode = async (email: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${api.url}/users/request-reset-code`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || "Failed to send verification code")
+    }
+
+    return true
+  } catch (error) {
+    console.error("Request reset code error:", error)
+    throw error
+  }
+}
+
+// Add a new function to verify the reset code
+export const verifyResetCode = async (email: string, code: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${api.url}/users/verify-reset-code`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, code }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || "Invalid verification code")
+    }
+
+    return true
+  } catch (error) {
+    console.error("Verify reset code error:", error)
+    throw error
+  }
+}
+
+// Modify the existing resetPassword function to include verification
+export const resetPassword = async (email: string, password: string, code: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${api.url}/users/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        new_password: password,
+        verification_code: code,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || "Failed to reset password")
+    }
+
+    return true
+  } catch (error) {
+    console.error("Reset password error:", error)
+    throw error
+  }
+}

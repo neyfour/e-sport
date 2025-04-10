@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { X, Mail, Lock, User, ArrowRight } from "lucide-react"
-import { loginUser, registerUser, googleLogin } from "../api/authApi"
+import { loginUser, registerUser, googleLogin, requestPasswordResetCode, resetPassword } from "../api/authApi"
 import { useStore } from "../store"
 import toast from "react-hot-toast"
 import { GoogleLogin } from "@react-oauth/google"
@@ -31,6 +31,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   })
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
   const [passwordResetError, setPasswordResetError] = useState("")
+
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false)
+  const [verificationCode, setVerificationCode] = useState(["", "", "", ""])
+  const [verificationLoading, setVerificationLoading] = useState(false)
+  const [verificationError, setVerificationError] = useState("")
+  const [tempResetData, setTempResetData] = useState({ email: "" })
 
   const setUser = useStore((state) => state.setUser)
   const setToken = useStore((state) => state.setToken)
@@ -115,47 +121,23 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setResetPasswordLoading(true)
 
     try {
-      // Call the API to reset password
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/reset-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: resetPasswordData.email,
-          new_password: resetPasswordData.password,
-        }),
-      })
+      // Request verification code instead of directly resetting password
+      await requestPasswordResetCode(resetPasswordData.email)
 
-      const data = await response.json()
+      // Store email for verification step
+      setTempResetData({ email: resetPasswordData.email })
 
-      if (!response.ok) {
-        throw new Error(data.detail || "Failed to reset password")
-      }
+      // Show verification code input
+      setIsVerificationOpen(true)
 
-      // Success
-      toast.success("Password reset successful! Please log in with your new password.")
-
-      // Close forgot password modal and go back to login
-      setIsForgotPasswordOpen(false)
-      setIsLogin(true)
-
-      // Pre-fill the email field for convenience
-      setFormData((prev) => ({ ...prev, email: resetPasswordData.email, password: "" }))
-
-      // Reset the form
-      setResetPasswordData({
-        email: "",
-        password: "",
-        confirmPassword: "",
-      })
+      toast.success("Verification code sent to your email. Please check your inbox and spam folder.")
     } catch (error) {
       if (error instanceof Error) {
         setPasswordResetError(error.message)
         toast.error(error.message)
       } else {
         setPasswordResetError("An unknown error occurred")
-        toast.error("Failed to reset password")
+        toast.error("Failed to send verification code")
       }
     } finally {
       setResetPasswordLoading(false)
@@ -205,6 +187,75 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
   const toggleResetPasswordVisibility = () => setShowResetPassword(!showResetPassword)
   const toggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword)
+
+  const handleVerificationCodeChange = (index: number, value: string) => {
+    // Only allow digits
+    if (value && !/^\d*$/.test(value)) {
+      return
+    }
+
+    const newVerificationCode = [...verificationCode]
+    newVerificationCode[index] = value
+    setVerificationCode(newVerificationCode)
+
+    // Auto-focus to next input
+    if (value && index < 3) {
+      const nextInput = document.getElementById(`verification-code-${index + 1}`) as HTMLInputElement
+      if (nextInput) {
+        nextInput.focus()
+      }
+    }
+  }
+
+  const handleVerificationKeyDown = (index: number, e: any) => {
+    if (e.key === "Backspace" && verificationCode[index] === "" && index > 0) {
+      const prevInput = document.getElementById(`verification-code-${index - 1}`) as HTMLInputElement
+      if (prevInput) {
+        prevInput.focus()
+      }
+    }
+  }
+
+  const handleVerifyCode = async () => {
+    setVerificationError("")
+    setVerificationLoading(true)
+
+    try {
+      const code = verificationCode.join("")
+
+      // Reset password with verification code
+      await resetPassword(tempResetData.email, resetPasswordData.password, code)
+
+      // Success
+      toast.success("Password reset successful! Please log in with your new password.")
+
+      // Close verification modal and go back to login
+      setIsVerificationOpen(false)
+      setIsForgotPasswordOpen(false)
+      setIsLogin(true)
+
+      // Pre-fill the email field for convenience
+      setFormData((prev) => ({ ...prev, email: tempResetData.email, password: "" }))
+
+      // Reset the form
+      setResetPasswordData({
+        email: "",
+        password: "",
+        confirmPassword: "",
+      })
+      setVerificationCode(["", "", "", ""])
+    } catch (error) {
+      if (error instanceof Error) {
+        setVerificationError(error.message)
+        toast.error(error.message)
+      } else {
+        setVerificationError("An unknown error occurred")
+        toast.error("Failed to verify code")
+      }
+    } finally {
+      setVerificationLoading(false)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -311,7 +362,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 {isLogin && (
                   <button
                     type="button"
-                    onClick={() => setIsForgotPasswordOpen(true)}
+                    onClick={() => {
+                      setIsForgotPasswordOpen(true)
+                      setTempResetData({ email: formData.email })
+                    }}
                     className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
                   >
                     Forgot password?
@@ -676,7 +730,124 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         </div>
       )}
+
+      {isVerificationOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 w-full max-w-md relative overflow-hidden">
+            {/* Decorative top bar */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+
+            <button
+              onClick={() => setIsVerificationOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Verify Your Email</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
+                Enter the 4-digit code sent to {tempResetData.email}
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex justify-center space-x-3">
+                {[0, 1, 2, 3].map((index) => (
+                  <input
+                    key={index}
+                    id={`verification-code-${index}`}
+                    type="text"
+                    maxLength={1}
+                    value={verificationCode[index]}
+                    onChange={(e) => handleVerificationCodeChange(index, e.target.value)}
+                    onKeyDown={(e) => handleVerificationKeyDown(index, e)}
+                    className="w-14 h-14 text-center text-2xl font-bold border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    autoComplete="off"
+                  />
+                ))}
+              </div>
+
+              {verificationError && (
+                <div className="text-sm text-red-500 dark:text-red-400 text-center">{verificationError}</div>
+              )}
+
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsVerificationOpen(false)}
+                  className="flex-1 py-2.5 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-medium rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyCode}
+                  disabled={verificationLoading}
+                  className="flex-1 flex items-center justify-center py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-500/50 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {verificationLoading ? (
+                    <span className="flex items-center justify-center">
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Verifying...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      Confirm
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+                Didn't receive the code?{" "}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setVerificationLoading(true)
+                      await requestPasswordResetCode(tempResetData.email)
+                      toast.success("A new verification code has been sent to your email")
+                    } catch (error) {
+                      if (error instanceof Error) {
+                        toast.error(error.message)
+                      } else {
+                        toast.error("Failed to resend verification code")
+                      }
+                    } finally {
+                      setVerificationLoading(false)
+                    }
+                  }}
+                  className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
+                >
+                  Resend code
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
-

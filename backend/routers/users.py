@@ -11,6 +11,26 @@ from pymongo import MongoClient
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from dateutil.parser import parse 
+import random
+import string
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from fastapi_mail.errors import ConnectionErrors
+
+# Configure FastMail
+conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME", " amine82baadi@gmail.com"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", "bhqy jius rczk isdi"),
+    MAIL_FROM=os.getenv("MAIL_FROM", "amine82baadi@gmail.com"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
+    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
+)
+
+mail = FastMail(conf)
+from pydantic import EmailStr, BaseModel
 
 # MongoDB connection
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://amine:amine200%40@cluster-0.iiu2z.mongodb.net/ecommerce_db?retryWrites=true&w=majority")
@@ -64,9 +84,34 @@ class SuspendUser(BaseModel):
     suspended_until: Optional[str] = None
     reason: Optional[str] = None
 
+
+# Add these models to your existing models section
+class RequestResetCode(BaseModel):
+    email: EmailStr
+
+class VerifyResetCode(BaseModel):
+    email: EmailStr
+    code: str
+
+# Update the PasswordReset model to include verification code
 class PasswordReset(BaseModel):
     email: EmailStr
     new_password: str
+    verification_code: str
+
+# Add these models to your existing models section
+class RequestPasswordReset(BaseModel):
+    email: EmailStr
+
+class VerifyPasswordReset(BaseModel):
+    email: EmailStr
+    token: str
+    new_password: str
+# Update the PasswordReset model to include verification code
+class PasswordReset(BaseModel):
+    email: EmailStr
+    new_password: str
+    verification_code: str
 
 # Helper functions
 def verify_password(plain_password, hashed_password):
@@ -669,32 +714,150 @@ async def unsuspend_user(
     return {"message": "User unsuspended successfully"}
 
 
-@router.post("/reset-password")
-async def reset_password(reset_data: PasswordReset):
-    # Check if user exists
-    user = db.users.find_one({"email": reset_data.email})
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User with this email not found"
+
+@router.post("/request-reset-code")
+async def request_reset_code(reset_data: RequestResetCode):
+    try:
+        # Check if user exists
+        user = db.users.find_one({"email": reset_data.email})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User with this email not found"
+            )
+        
+        # Generate a random 4-digit code
+        code = ''.join(random.choices(string.digits, k=4))
+        
+        # Store the code in the database with expiration time (15 minutes)
+        expiration = datetime.utcnow() + timedelta(minutes=15)
+        
+        # Update or insert reset code - Make sure the collection exists
+        db.password_reset_codes.update_one(
+            {"email": reset_data.email},
+            {
+                "$set": {
+                    "code": code,
+                    "expires_at": expiration
+                }
+            },
+            upsert=True
         )
+        
+        # Print the code for debugging
+        print(f"Password reset code for {reset_data.email}: {code}")
+        
+        # Create the email content
+        email_subject = "Password Reset Verification Code"
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+                <h2 style="color: #4f46e5; text-align: center;">Password Reset Verification</h2>
+                <p>Hello,</p>
+                <p>We received a request to reset your password. Please use the following verification code to complete the process:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <div style="font-size: 24px; font-weight: bold; letter-spacing: 8px; padding: 15px; background-color: #f3f4f6; border-radius: 5px; display: inline-block;">
+                        {code}
+                    </div>
+                </div>
+                <p>This code will expire in 15 minutes.</p>
+                <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
+                <p>Thank you,<br>Your E-SPORTS Team</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create the message
+        message = MessageSchema(
+            subject=email_subject,
+            recipients=[reset_data.email],
+            body=email_body,
+            subtype="html"
+        )
+        
+        # Send the email
+        await mail.send_message(message)
+        
+        return {"message": "Verification code sent to your email"}
     
-    # Hash the new password
-    hashed_password = get_password_hash(reset_data.new_password)
-    
-    # Update the user's password
-    result = db.users.update_one(
-        {"email": reset_data.email},
-        {"$set": {"hashed_password": hashed_password}}
-    )
-    
-    if result.modified_count == 0:
+    except ConnectionErrors as e:
+        print(f"Failed to send email: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update password"
+            detail="Failed to send verification email. Please try again later."
         )
-    
-    return {"message": "Password has been reset successfully"}
+    except Exception as e:
+        print(f"Unexpected error in request_reset_code: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
+@router.post("/reset-password")
+async def reset_password(reset_data: PasswordReset):
+    try:
+        # Check if user exists
+        user = db.users.find_one({"email": reset_data.email})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User with this email not found"
+            )
+        
+        # Verify the code
+        reset_record = db.password_reset_codes.find_one({"email": reset_data.email})
+        
+        if not reset_record:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No verification code requested for this email"
+            )
+        
+        # Check if code has expired
+        if datetime.utcnow() > reset_record["expires_at"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification code has expired. Please request a new one."
+            )
+        
+        # Check if code matches
+        if reset_record["code"] != reset_data.verification_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code"
+            )
+        
+        # Hash the new password
+        hashed_password = get_password_hash(reset_data.new_password)
+        
+        # Update the user's password
+        result = db.users.update_one(
+            {"email": reset_data.email},
+            {"$set": {"hashed_password": hashed_password}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update password"
+            )
+        
+        # Delete the used verification code
+        db.password_reset_codes.delete_one({"email": reset_data.email})
+        
+        return {"message": "Password has been reset successfully"}
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    
+    except Exception as e:
+        print(f"Unexpected error in reset_password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 
